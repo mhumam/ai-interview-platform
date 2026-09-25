@@ -21,10 +21,9 @@ x-api-env: &api_env
   WEB_BASE_URL: http://localhost:5173
   ALLOWED_ORIGINS: http://localhost:5173
   TOKEN_EXPIRATION_TIME: "259200"
-  # Placeholder — replace with a real key to exercise AI-backed features
-  # (interview audio, portfolio/fit-gap generation). Not required for
-  # exploring the rest of the product.
-  GEMINI_API_KEY: dummy_key_replace_me
+  # Read from a root-level .env file (gitignored), NOT hardcoded here — this
+  # file is tracked by git. Falls back to a placeholder if no .env is present.
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-dummy_key_replace_me}
   GEMINI_LIVE_MODEL: gemini-2.0-flash-live-001
   GEMINI_FLASH_MODEL: gemini-2.0-flash-001
   GEMINI_PRO_MODEL: gemini-2.0-pro-001
