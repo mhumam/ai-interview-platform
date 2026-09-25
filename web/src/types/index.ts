@@ -188,7 +188,10 @@ export type InterviewState =
   | "invalid_link"
   // Fetching candidate info failed for a reason that isn't a bad token
   // (network blip, 5xx). Retryable, unlike invalid_link.
-  | "connection_error";
+  | "connection_error"
+  // getUserMedia failed at the moment the interview actually tried to start,
+  // after HardwareCheck already passed (e.g. mic revoked/grabbed in between).
+  | "mic_error";
 
 export type InterviewSpeaker = "ai" | "candidate" | null;
 

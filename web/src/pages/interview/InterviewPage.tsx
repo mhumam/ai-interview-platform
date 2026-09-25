@@ -167,8 +167,20 @@ export default function InterviewPage() {
     onReconnected: handleReconnected,
   });
 
+  const handleMicError = useCallback(() => {
+    // getUserMedia failed after HardwareCheck already passed (mic revoked,
+    // grabbed by another app, permission withdrawn at the last second — see
+    // assessment/03_defining_problem_and_gap_to_ideal_condition.md F6). Tear
+    // down the socket we already opened in startInterview so it doesn't sit
+    // connected with nothing feeding it, and surface a state the candidate
+    // can actually act on instead of an indefinite "Connecting..." spinner.
+    disconnect();
+    setInterviewState("mic_error");
+  }, [disconnect]);
+
   const { start: startCapture, stop: stopCapture, mute, unmute } = useAudioCapture({
     onFrame: send,
+    onError: handleMicError,
   });
 
   muteRef.current = mute;
@@ -297,6 +309,24 @@ export default function InterviewPage() {
           We had trouble reaching the server. Check your connection and try again.
         </p>
         <Button onClick={retryCandidateInfo}>Retry</Button>
+      </div>
+    );
+  }
+
+  // ── State: Microphone failed at start ───────────────────────────────────
+  // HardwareCheck passed earlier, but getUserMedia failed anyway when the
+  // interview actually tried to start (mic revoked/grabbed in between).
+  if (interviewState === "mic_error") {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <MicOff className="h-10 w-10 text-destructive mx-auto" />
+        <h2 className="text-xl font-semibold">Couldn't access your microphone</h2>
+        <p className="text-sm text-muted-foreground">
+          Make sure no other app is using your microphone and that permission is granted, then try again.
+        </p>
+        <Button onClick={() => { setInterviewState("idle"); setHardwareCheckDone(false); }}>
+          Try again
+        </Button>
       </div>
     );
   }
