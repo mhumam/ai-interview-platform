@@ -17,6 +17,7 @@ export default function PortfolioPage() {
   const navigate = useNavigate();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [notStarted, setNotStarted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [overrides, setOverrides] = useState<Record<number, AssessorOverride>>({});
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
@@ -27,10 +28,15 @@ export default function PortfolioPage() {
   const fetchPortfolio = useCallback(async () => {
     const res = await sessionsApi.getPortfolio(Number(sessionId));
     const data = res.data as any;
-    if (data.status === "generating" || data.portfolio?.generation_status === "generating" || data.portfolio?.generation_status === "pending") {
+    if (data.status === "not_started") {
+      setNotStarted(true);
+      setGenerating(false);
+    } else if (data.status === "generating" || data.portfolio?.generation_status === "generating" || data.portfolio?.generation_status === "pending") {
+      setNotStarted(false);
       setGenerating(true);
     } else if (data.portfolio) {
       setPortfolio(data.portfolio);
+      setNotStarted(false);
       setGenerating(false);
       // Build overrides map
       const overrideMap: Record<number, AssessorOverride> = {};
@@ -152,6 +158,18 @@ export default function PortfolioPage() {
           )}
         </div>
       </div>
+
+      {/* Not started state — interview was never taken, so no generation was ever triggered */}
+      {notStarted && (
+        <div className="border rounded-lg p-12 text-center space-y-3">
+          <div>
+            <p className="font-medium">Interview hasn't started yet</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              This candidate hasn't taken the interview, so there's no transcript to analyze yet.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Generating state */}
       {generating && (
