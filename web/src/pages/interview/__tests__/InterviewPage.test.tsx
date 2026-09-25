@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import InterviewPage from "@/pages/interview/InterviewPage";
 import { sessionsApi } from "@/services/sessions";
 
-// Regression coverage for assessment/03_defining_problem_and_gap_to_ideal_condition.md F2:
-// any failure loading candidate info used to collapse into the same
+// Regression coverage for assessment/03_defining_problem_and_gap_to_ideal_condition.md F2 and F6.
+//
+// F2: any failure loading candidate info used to collapse into the same
 // "✅ Interview Complete" screen as a genuinely finished interview. A bad
 // token must show "invalid link", and a transient failure must be retryable
 // instead of terminal.
+//
+// F6: getUserMedia failing at the moment the interview actually starts (after
+// HardwareCheck already passed) used to be silently swallowed, leaving the
+// candidate stuck on "Connecting..." forever.
 
 vi.mock("@/services/sessions", () => ({
   sessionsApi: {
@@ -17,9 +23,13 @@ vi.mock("@/services/sessions", () => ({
 }));
 
 // HardwareCheck does its own internet-speed/camera/mic probing, out of scope
-// for this test — replace with a stub so it doesn't interfere.
+// for this test — replace with a button that immediately triggers onStart,
+// so we can drive InterviewPage's own state machine (the thing F6 actually
+// lives in) directly.
 vi.mock("@/components/HardwareCheck", () => ({
-  default: () => <div>hardware check stub</div>,
+  default: ({ onStart }: { onStart: () => void }) => (
+    <button onClick={onStart}>Start Interview (mocked hardware check)</button>
+  ),
 }));
 
 vi.mock("@/hooks/useAudioWebSocket", () => ({
@@ -85,5 +95,30 @@ describe("InterviewPage — candidate info failures (F2)", () => {
     renderAtToken("finished-token");
 
     expect(await screen.findByText(/interview complete/i)).toBeInTheDocument();
+  });
+});
+
+describe("InterviewPage — microphone failure at start (F6)", () => {
+  beforeEach(() => {
+    vi.mocked(sessionsApi.getCandidateInfo).mockReset();
+    vi.mocked(sessionsApi.getCandidateInfo).mockResolvedValue({
+      data: { session_id: 1, role_title: "Senior Engineer", time_limit_min: 45, session_status: "pending" },
+    } as any);
+
+    Object.defineProperty(globalThis.navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("Permission denied", "NotAllowedError")) },
+    });
+  });
+
+  it("surfaces a recoverable error instead of hanging on Connecting forever", async () => {
+    const user = userEvent.setup();
+    renderAtToken("good-token");
+
+    const startButton = await screen.findByText(/start interview \(mocked hardware check\)/i);
+    await user.click(startButton);
+
+    expect(await screen.findByText(/couldn't access your microphone/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^connecting\.\.\.$/i)).not.toBeInTheDocument();
   });
 });
