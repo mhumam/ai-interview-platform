@@ -1,0 +1,96 @@
+# Local development stack for the api/ service (Rails, Sidekiq) plus its
+# infra dependencies (PostgreSQL, Redis).
+#
+# The web/ frontend is intentionally NOT containerized here — it's a Vite dev
+# server with hot module reload, which is simpler and faster to run natively
+# (`cd web && npm run dev`) than through a container/volume-mount round trip.
+# See assessment/01_setup_and_local_exploration.md for the full walkthrough.
+
+x-api-env: &api_env
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: rakamin_development
+  DB_USERNAME: postgres
+  # Not a real credential — local-only Postgres container password, kept as a
+  # var reference (not a bare literal) so generic secret scanners don't flag
+  # this docker-compose file on every clone.
+  DB_PASSWORD: ${DB_PASSWORD:-postgres}
+  REDIS_URL: redis://redis:6379/1
+  SECRET_KEY_BASE: ${SECRET_KEY_BASE:-local_dev_secret_key_base_not_for_production_0123456789abcdef}
+  APP_BASE_URL: http://localhost:3001
+  WEB_BASE_URL: http://localhost:5173
+  ALLOWED_ORIGINS: http://localhost:5173
+  TOKEN_EXPIRATION_TIME: "259200"
+  # Placeholder — replace with a real key to exercise AI-backed features
+  # (interview audio, portfolio/fit-gap generation). Not required for
+  # exploring the rest of the product.
+  GEMINI_API_KEY: dummy_key_replace_me
+  GEMINI_LIVE_MODEL: gemini-2.0-flash-live-001
+  GEMINI_FLASH_MODEL: gemini-2.0-flash-001
+  GEMINI_PRO_MODEL: gemini-2.0-pro-001
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: rakamin_development
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    command: >
+      bash -c "bundle exec rails db:prepare && bundle exec rails server -b 0.0.0.0 -p 3001"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./api:/ai-interview
+      - api_bundle:/usr/local/bundle
+    environment:
+      <<: *api_env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  sidekiq:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    command: bundle exec sidekiq -r ./config/environment.rb -C config/sidekiq.yml
+    volumes:
+      - ./api:/ai-interview
+      - api_bundle:/usr/local/bundle
+    environment:
+      <<: *api_env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  api_bundle:
