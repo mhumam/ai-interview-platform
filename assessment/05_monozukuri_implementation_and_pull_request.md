@@ -60,10 +60,12 @@ Setelah PR dibuka, GitGuardian menandai `DB_PASSWORD: postgres` di `docker-compo
 
 **Selesai.** Dikerjakan di branch terpisah `scratch/seeded-fault-test` (ter-push ke `https://github.com/mhumam/ai-interview-platform/tree/scratch/seeded-fault-test`, tidak di-merge ke branch kerja utama):
 
-1. **Rusak** (`bb73929`): `Session#invite_url` dikembalikan ke perilaku sebelum fix F1 (pakai `APP_BASE_URL` lagi).
+1. **Rusak** ([`bb73929`](https://github.com/mhumam/ai-interview-platform/commit/bb73929)): `Session#invite_url` dikembalikan ke perilaku sebelum fix F1 (pakai `APP_BASE_URL` lagi).
 2. **Jalankan test** → `spec/models/session_spec.rb`: **2 examples, 2 failures**. Full suite: **9 examples, 2 failures** — persis dan hanya kedua spec F1 yang gagal, membuktikan test-nya presisi (tidak ada efek samping ke spec lain).
-3. **Revert** (`6cf1688`, `git revert bb73929`): kode kembali ke fix F1 yang benar.
+3. **Revert** ([`6cf1688`](https://github.com/mhumam/ai-interview-platform/commit/6cf1688), `git revert bb73929`): kode kembali ke fix F1 yang benar.
 4. **Verifikasi ulang** → full suite: **9 examples, 0 failures**.
+
+Tidak dibuka sebagai Pull Request terpisah — brief hanya meminta "history visible" (branch ter-push cukup), dan karena hasil akhir rusak→revert ini net-zero perubahan kode, membuka PR untuknya justru tidak bermakna (GitHub akan menampilkan "no changes to merge"). Link commit di atas sudah cukup untuk reviewer memverifikasi tanpa perlu clone branch-nya.
 
 History dua commit ini (rusak → revert) tetap terlihat di branch scratch sebagai bukti, tidak di-squash atau disembunyikan.
 
